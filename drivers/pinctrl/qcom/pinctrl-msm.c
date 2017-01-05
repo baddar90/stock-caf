@@ -1049,7 +1049,8 @@ bool msm_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
 			}
 			/*zte_pm ----*/
 
-			handled += generic_handle_irq(irq_pin);
+			generic_handle_irq(irq_pin);
+			handled++;
 		}
 	}
 
