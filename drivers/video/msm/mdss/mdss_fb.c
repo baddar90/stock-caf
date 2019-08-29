@@ -47,6 +47,7 @@
 #include <linux/sw_sync.h>
 #include <linux/file.h>
 #include <linux/kthread.h>
+#include <linux/devfreq_boost.h>
 #include <linux/dma-buf.h>
 #include "mdss_fb.h"
 #include "mdss_mdp_splash_logo.h"
@@ -5057,6 +5058,9 @@ int mdss_fb_do_ioctl(struct fb_info *info, unsigned int cmd,
 				pr_info("%s: MSMFB_ATOMIC_COMMIT skipframe %d break\n", __func__, skipframe);
 				break;
 			}
+#endif
+#ifdef CONFIG_DEVFREQ_BOOST
+		devfreq_boost_kick(DEVFREQ_MSM_CPUBW);
 #endif
 			ret = mdss_fb_atomic_commit_ioctl(info, argp, file);
 			break;
