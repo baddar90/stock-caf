@@ -368,7 +368,7 @@ static void ip6gre_tunnel_uninit(struct net_device *dev)
 
 
 static void ip6gre_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
-		       u8 type, u8 code, int offset, __be32 info)
+	u8 type, u8 code, int offset, __be32 info)
 {
 	const struct gre_base_hdr *greh;
 	const struct ipv6hdr *ipv6h;
@@ -399,6 +399,7 @@ static void ip6gre_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
 
 	t = ip6gre_tunnel_lookup(skb->dev, &ipv6h->daddr, &ipv6h->saddr,
 				 key, greh->protocol);
+
 	if (t == NULL)
 		return;
 
