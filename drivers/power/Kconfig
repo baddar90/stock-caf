@@ -627,6 +627,9 @@ config MSM_BCL_CTL
 	  basic functionalities. This framework abstracts the underlying
 	  hardware for the top level modules.
 
+config ZTE_HALL_AVAILABLE
+	tristate "Hall available"
+
 config MSM_BCL_PERIPHERAL_CTL
 	bool "BCL driver to control the PMIC BCL peripheral"
 	depends on SPMI || MSM_SPMI

@@ -75,6 +75,7 @@ enum msm_pc_count_offsets {
 	MSM_PC_NUM_COUNTERS,
 };
 
+
 static bool msm_pm_ldo_retention_enabled = true;
 static bool msm_pm_tz_flushes_cache;
 static bool msm_pm_ret_no_pll_switch;
