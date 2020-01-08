@@ -442,6 +442,7 @@ config TASKSTATS
 config TASK_DELAY_ACCT
 	bool "Enable per-task delay accounting"
 	depends on TASKSTATS
+	default y
 	help
 	  Collect information on time spent by a task waiting for system
 	  resources like cpu, synchronous block I/O completion and swapping
@@ -1152,7 +1153,7 @@ endif #CGROUP_SCHED
 config BLK_CGROUP
 	bool "Block IO controller"
 	depends on BLOCK
-	default n
+	default y
 	---help---
 	Generic block IO controller cgroup interface. This is the common
 	cgroup interface which should be used by various IO controlling
