@@ -162,6 +162,11 @@ struct input_keymap_entry {
 
 #define EVIOCSCLOCKID		_IOW('E', 0xa0, int)			/* Set clockid to be used for timestamps */
 
+/* add start by zte_pm for Hall sensor driver*/
+#define KEY_HALL_SENSOR_DOWN	249
+#define KEY_HALL_SENSOR_UP	 250
+/* add end by zte_pm for Hall sensor driver*/
+
 /*
  * IDs.
  */
