@@ -813,6 +813,8 @@ static int msm_compr_send_media_format_block(struct snd_compr_stream *cstream,
 
 	switch (prtd->codec) {
 	case FORMAT_LINEAR_PCM:
+/* ZTE_chenjun */
+		pr_info("FORMAT_LINEAR_PCM\n");
 		pr_debug("SND_AUDIOCODEC_PCM\n");
 		if (pdata->ch_map[rtd->dai_link->be_id]) {
 			use_default_chmap =
@@ -1026,6 +1028,10 @@ static int msm_compr_send_media_format_block(struct snd_compr_stream *cstream,
 		pr_debug("%s, unsupported format, skip", __func__);
 		break;
 	}
+
+/* ZTE_chenjun */
+	pr_info("%s: codec(%#X), format(%#X), bits(%d)\n", __func__, prtd->codec, prtd->codec_param.codec.format, bit_width);
+
 	return ret;
 }
 
@@ -1086,6 +1092,9 @@ static int msm_compr_configure_dsp_for_playback
 		bits_per_sample = 24;
 	else if (prtd->codec_param.codec.format == SNDRV_PCM_FORMAT_S32_LE)
 		bits_per_sample = 32;
+
+/* ZTE_chenjun */
+	pr_info("%s: codec(%#X), rate(%d), bits(%d)\n", __func__, prtd->codec, prtd->sample_rate, bits_per_sample);
 
 	if (prtd->compr_passthr != LEGACY_PCM) {
 		ret = q6asm_open_write_compressed(ac, prtd->codec,
@@ -2321,6 +2330,10 @@ static int msm_compr_trigger(struct snd_compr_stream *cstream, int cmd)
 
 		pr_debug("%s: open_write stream_id %d bits_per_sample %d",
 				__func__, stream_id, bits_per_sample);
+
+/* ZTE_chenjun */
+		pr_info("%s: codec(%#X), rate(%d), bits(%d)\n", __func__, prtd->codec, prtd->sample_rate, bits_per_sample);
+
 		rc = q6asm_stream_open_write_v3(prtd->audio_client,
 				prtd->codec, bits_per_sample,
 				stream_id,

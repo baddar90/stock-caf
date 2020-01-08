@@ -2384,9 +2384,9 @@ int adm_open(int port_id, int path, int rate, int channel_mode, int topology,
 	int port_idx, copp_idx, flags;
 	int tmp_port = q6audio_get_port_id(port_id);
 
-	pr_debug("%s:port %#x path:%d rate:%d mode:%d perf_mode:%d,topo_id %d\n",
+	pr_info("%s: port %#x path:%d rate:%d mode:%d perf_mode:%d,topo_id %#X, bit(%d)\n",
 		 __func__, port_id, path, rate, channel_mode, perf_mode,
-		 topology);
+		 topology, bit_width); /* ZTE_chenjun */
 
 	port_id = q6audio_convert_virtual_to_portid(port_id);
 	port_idx = adm_validate_and_get_port_index(port_id);
@@ -2435,8 +2435,12 @@ int adm_open(int port_id, int path, int rate, int channel_mode, int topology,
 		rate = 16000;
 
 	copp_idx = adm_get_idx_if_copp_exists(port_idx, topology, perf_mode,
-					      rate, bit_width, app_type,
-					      session_type);
+						rate, bit_width, app_type,
+                        session_type);
+
+    	pr_info("%s: copp_idx-%d, rate-%d, bit_width-%d, app_type-%#X\n",
+		 __func__, copp_idx, rate, bit_width, app_type); /* ZTE_chenjun */
+
 	if (copp_idx < 0) {
 		copp_idx = adm_get_next_available_copp(port_idx);
 		if (copp_idx >= MAX_COPPS_PER_PORT) {
