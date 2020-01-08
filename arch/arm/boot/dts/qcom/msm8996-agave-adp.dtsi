@@ -968,31 +968,6 @@
 				<100 512 207108 14432000>;
 	};
 
-	i2c@75ba000 {
-		synaptics@20 {
-			compatible = "synaptics,dsx";
-			reg = <0x20>;
-			interrupt-parent = <&tlmm>;
-			interrupts = <125 0x2008>;
-			vdd-supply = <&pm8994_l14>;
-			avdd-supply = <&pm8994_l22>;
-			pinctrl-names = "pmx_ts_active", "pmx_ts_suspend";
-			pinctrl-0 = <&ts_active>;
-			pinctrl-1 = <&ts_suspend>;
-			synaptics,display-coords = <0 0 1599 2559>;
-			synaptics,panel-coords = <0 0 1599 2703>;
-			synaptics,reset-gpio = <&tlmm 89 0x00>;
-			synaptics,irq-gpio = <&tlmm 125 0x2008>;
-			synaptics,disable-gpios;
-			synaptics,fw-name = "PR1702898-s3528t_00350002.img";
-			/* Underlying clocks used by secure touch */
-			clock-names = "iface_clk", "core_clk";
-			clocks = <&clock_gcc clk_gcc_blsp2_ahb_clk>,
-				 <&clock_gcc clk_gcc_blsp2_qup6_i2c_apps_clk>;
-			status = "disabled";
-		};
-	};
-
 	i2c@75b6000 { /* BLSP8 */
 		/* ADV7533 configuration */
 		adv7533@3d {
@@ -1034,16 +1009,6 @@
 			adi,irq-gpio = <&tlmm 108 0x2002>;
 			adi,switch-gpio = <&tlmm 107 0x0>;
 		};
-	};
-
-	gen-vkeys {
-		compatible = "qcom,gen-vkeys";
-		label = "synaptics_dsx";
-		qcom,disp-maxx = <1599>;
-		qcom,disp-maxy = <2559>;
-		qcom,panel-maxx = <1599>;
-		qcom,panel-maxy = <2703>;
-		qcom,key-codes = <158 139 102 217>;
 	};
 
 	gpio_keys {
