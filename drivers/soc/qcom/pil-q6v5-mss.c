@@ -32,6 +32,7 @@
 #include <soc/qcom/ramdump.h>
 #include <soc/qcom/smem.h>
 #include <soc/qcom/smsm.h>
+#include <soc/qcom/vendor/modem_fatal_error.h>
 
 #include "peripheral-loader.h"
 #include "pil-q6v5.h"
@@ -62,6 +63,8 @@ static void log_modem_sfr(void)
 
 	strlcpy(reason, smem_reason, min(size, MAX_SSR_REASON_LEN));
 	pr_err("modem subsystem failure reason: %s.\n", reason);
+
+	modem_fatal_error_update_reason(smem_reason);
 
 	smem_reason[0] = '\0';
 	wmb();
@@ -122,6 +125,9 @@ static int modem_shutdown(const struct subsys_desc *subsys, bool force_stop)
 	}
 
 	pil_shutdown(&drv->q6->desc);
+
+	/* re-assign sdlog mem back to linux to avoid crash when modem subsystem restart */
+	pil_assign_mem_back_to_linux(&drv->q6->desc);
 
 	return 0;
 }
