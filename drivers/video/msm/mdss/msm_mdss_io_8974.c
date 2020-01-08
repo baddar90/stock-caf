@@ -931,11 +931,8 @@ static void mdss_dsi_8996_phy_power_off(
 {
 	int ln;
 	void __iomem *base;
-	u32 data;
 
-	/* Turn off PLL power */
-	data = MIPI_INP(ctrl->phy_io.base + DSIPHY_CMN_CTRL_0);
-	MIPI_OUTP(ctrl->phy_io.base + DSIPHY_CMN_CTRL_0, data & ~BIT(7));
+	MIPI_OUTP(ctrl->phy_io.base + DSIPHY_CMN_CTRL_0, 0x7f);
 
 	/* 4 lanes + clk lane configuration */
 	for (ln = 0; ln < 5; ln++) {
@@ -991,7 +988,6 @@ static void mdss_dsi_8996_phy_power_on(
 	void __iomem *base;
 	struct mdss_dsi_phy_ctrl *pd;
 	char *ip;
-	u32 data;
 
 	pd = &(((ctrl->panel_data).panel_info.mipi).dsi_phy_db);
 
@@ -1011,10 +1007,6 @@ static void mdss_dsi_8996_phy_power_on(
 	}
 
 	mdss_dsi_8996_phy_regulator_enable(ctrl);
-
-	/* Turn on PLL power */
-	data = MIPI_INP(ctrl->phy_io.base + DSIPHY_CMN_CTRL_0);
-	MIPI_OUTP(ctrl->phy_io.base + DSIPHY_CMN_CTRL_0, data | BIT(7));
 }
 
 static void mdss_dsi_phy_power_on(
@@ -1124,8 +1116,6 @@ static void mdss_dsi_8996_phy_config(struct mdss_dsi_ctrl_pdata *ctrl)
 	if (!(pinfo->allow_phy_power_off) && (pinfo->type == MIPI_CMD_PANEL)) {
 		data = MIPI_INP(ctrl->phy_io.base + DSIPHY_CMN_CTRL_0);
 		MIPI_OUTP(ctrl->phy_io.base + DSIPHY_CMN_CTRL_0, data | 0x7f);
-	} else {
-		MIPI_OUTP(ctrl->phy_io.base + DSIPHY_CMN_CTRL_0, 0x7f);
 	}
 	wmb(); /* make sure registers committed */
 }
