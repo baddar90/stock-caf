@@ -2864,6 +2864,8 @@ static int __q6asm_open_write(struct audio_client *ac, uint32_t format,
 	}
 	ac->io_mode |= TUN_WRITE_IO_MODE;
 
+	pr_info("%s: format(%#X), bits(%d)\n", __func__, format, bits_per_sample); /* ZTE_chenjun */
+
 	return 0;
 fail_cmd:
 	return rc;
@@ -3123,6 +3125,9 @@ static int __q6asm_open_read_write(struct audio_client *ac, uint32_t rd_format,
 				atomic_read(&ac->cmd_state));
 		goto fail_cmd;
 	}
+
+	pr_info("%s: rd_format(%#X), wrformat(%#X), bits(%d)\n", __func__,
+			rd_format, wr_format, open.bits_per_sample); /* ZTE_chenjun */
 
 	return 0;
 fail_cmd:
@@ -4188,6 +4193,10 @@ int q6asm_enc_cfg_blk_pcm_v2(struct audio_client *ac,
 				atomic_read(&ac->cmd_state));
 		goto fail_cmd;
 	}
+
+	pr_info("%s: Session %d, rate = %d, channels = %d, bits(%d)\n", __func__,
+		ac->session, rate, channels, enc_cfg.bits_per_sample); /* ZTE_chenjun */
+
 	return 0;
 fail_cmd:
 	return rc;
@@ -4342,6 +4351,10 @@ int q6asm_enc_cfg_blk_pcm_native(struct audio_client *ac,
 				atomic_read(&ac->cmd_state));
 		goto fail_cmd;
 	}
+
+	pr_info("%s: Session %d, rate = %d, channels = %d, bits(%d)\n", __func__,
+		ac->session, rate, channels, enc_cfg.bits_per_sample); /* ZTE_chenjun */
+
 	return 0;
 fail_cmd:
 	return rc;
@@ -4813,6 +4826,9 @@ static int __q6asm_media_format_block_pcm(struct audio_client *ac,
 
 	memset(channel_mapping, 0, PCM_FORMAT_MAX_NUM_CHANNEL);
 
+	pr_info("%s: bits(%d), rate(%d)\n",
+		__func__, fmt.bits_per_sample, rate); /* ZTE_chenjun */
+
 	if (use_default_chmap) {
 		if (q6asm_map_channels(channel_mapping, channels, false)) {
 			pr_err("%s: map channels failed %d\n",
@@ -5165,6 +5181,9 @@ static int __q6asm_media_format_block_multi_ch_pcm(struct audio_client *ac,
 	channel_mapping = fmt.channel_mapping;
 
 	memset(channel_mapping, 0, PCM_FORMAT_MAX_NUM_CHANNEL);
+
+	pr_info("%s: rate[%d], ch[%d], bits[%d]\n", __func__, rate,
+		channels, fmt.bits_per_sample); /* ZTE_chenjun */
 
 	if (use_default_chmap) {
 		if (q6asm_map_channels(channel_mapping, channels, false)) {
@@ -8271,6 +8290,8 @@ int q6asm_get_asm_topology(int session_id)
 		goto done;
 	}
 	topology = (session[session_id].ac)->topology;
+	pr_info("%s: Using topology %#X\n", __func__, topology); /* ZTE_chenjun */
+
 done:
 	return topology;
 }
