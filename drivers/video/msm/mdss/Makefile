@@ -43,6 +43,16 @@ mdss-dsi-objs += mdss_dsi_clk.o
 obj-$(CONFIG_FB_MSM_MDSS) += mdss-dsi.o
 obj-$(CONFIG_FB_MSM_MDSS) += mdss_panel.o
 
+ifeq ($(CONFIG_ZTE_LCD_COMMON_FUNCTION),y)
+mdss-dsi-objs += zte_lcd_common.o
+ifeq ($(CONFIG_ZTE_LCD_REG_DEBUG),y)
+mdss-dsi-objs += zte_lcd_reg_debug.o
+endif
+ifeq ($(CONFIG_ZTE_LCDBL_I2C_CTRL_VSP_VSN),y)
+mdss-dsi-objs += zte_lcdbl_tps65132b.o
+endif
+endif
+
 ifneq ($(CONFIG_FB_MSM_MDSS_MDP3), y)
 obj-$(CONFIG_FB_MSM_MDSS) += mdss_hdmi_util.o
 obj-$(CONFIG_FB_MSM_MDSS) += mdss_hdmi_edid.o
