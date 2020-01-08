@@ -1,11 +1,11 @@
 /*
  * Synaptics DSX touchscreen driver
  *
- * Copyright (C) 2012-2015 Synaptics Incorporated. All rights reserved.
+ * Copyright (C) 2012-2016 Synaptics Incorporated. All rights reserved.
  *
  * Copyright (C) 2012 Alexandra Chin <alexandra.chin@tw.synaptics.com>
  * Copyright (C) 2012 Scott Lin <scott.lin@tw.synaptics.com>
- * Copyright (C) 2016 The Linux Foundation. All rights reserved.
+ *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -37,7 +37,7 @@
 #define SYNAPTICS_DS4 (1 << 0)
 #define SYNAPTICS_DS5 (1 << 1)
 #define SYNAPTICS_DSX_DRIVER_PRODUCT (SYNAPTICS_DS4 | SYNAPTICS_DS5)
-#define SYNAPTICS_DSX_DRIVER_VERSION 0x2064
+#define SYNAPTICS_DSX_DRIVER_VERSION 0x2070
 
 #include <linux/version.h>
 #ifdef CONFIG_FB
@@ -48,11 +48,11 @@
 #include <linux/earlysuspend.h>
 #endif
 
-#if (LINUX_VERSION_CODE > KERNEL_VERSION(2, 6, 38))
+#if (KERNEL_VERSION(2, 6, 38) < LINUX_VERSION_CODE)
 #define KERNEL_ABOVE_2_6_38
 #endif
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 7, 0))
+#if (KERNEL_VERSION(3, 7, 0) <= LINUX_VERSION_CODE)
 #define KERNEL_ABOVE_3_6
 #endif
 
@@ -62,13 +62,34 @@
 #define sstrtoul(...) strict_strtoul(__VA_ARGS__)
 #endif
 
-/*#define F51_DISCRETE_FORCE*/
+#define RAWDATA_LEN(raw_data_len)  sizeof(raw_data_len)
+#define MAX_2D_FAIL	0x0001
+#define MIN_2D_FAIL	0x0002
+#define MAX_0D_FAIL	0x0020
+#define MIN_0D_FAIL	0x0040
+#define SHORT_CIRCUIT_FAIL	0x0400
+
+#define SENSOR_MAX_X 1000
+#define SENSOR_MAX_Y 1000
+#define MIN_RX_TO_RX 900
+#define MAX_RX_TO_RX 1100
+#define RAWDATA_PRINT 0
+#define TOUCH_ABS_OFFSET_X 1080
+/*
+#define F51_DISCRETE_FORCE
 #ifdef F51_DISCRETE_FORCE
-/*#define FORCE_LEVEL_ADDR 0x041A*/
+#define FORCE_LEVEL_ADDR 0x0419
 #define FORCE_LEVEL_MAX 255
 #define CAL_DATA_SIZE 144
 #endif
+#define SYNA_TDDI
+*/
 
+#define CONFIG_CREATE_GLOVED_INTERFACE
+#define CONFIG_TOUCHSCREEN_VDDIO_USE_GPIO
+#ifndef ZTE_FASTMMI_MANUFACTURING_VERSION
+#define DO_STARTUP_FW_UPDATE
+#endif
 #define PDT_PROPS (0X00EF)
 #define PDT_START (0x00E9)
 #define PDT_END (0x00D0)
@@ -81,6 +102,7 @@
 #define SYNAPTICS_RMI4_F11 (0x11)
 #define SYNAPTICS_RMI4_F12 (0x12)
 #define SYNAPTICS_RMI4_F1A (0x1A)
+#define SYNAPTICS_RMI4_F21 (0x21)
 #define SYNAPTICS_RMI4_F34 (0x34)
 #define SYNAPTICS_RMI4_F35 (0x35)
 #define SYNAPTICS_RMI4_F38 (0x38)
@@ -190,9 +212,9 @@ struct synaptics_rmi4_f11_extra_data {
  * @data15_offset: offset to F12_2D_DATA15 register
  * @data15_size: size of F12_2D_DATA15 register
  * @data15_data: buffer for reading F12_2D_DATA15 register
- * @data23_offset: offset to F12_2D_DATA23 register
- * @data23_size: size of F12_2D_DATA23 register
- * @data23_data: buffer for reading F12_2D_DATA23 register
+ * @data29_offset: offset to F12_2D_DATA29 register
+ * @data29_size: size of F12_2D_DATA29 register
+ * @data29_data: buffer for reading F12_2D_DATA29 register
  * @ctrl20_offset: offset to F12_2D_CTRL20 register
  */
 struct synaptics_rmi4_f12_extra_data {
@@ -201,9 +223,9 @@ struct synaptics_rmi4_f12_extra_data {
 	unsigned char data15_offset;
 	unsigned char data15_size;
 	unsigned char data15_data[(F12_FINGERS_TO_SUPPORT + 7) / 8];
-	unsigned char data23_offset;
-	unsigned char data23_size;
-	unsigned char data23_data[F12_FINGERS_TO_SUPPORT];
+	unsigned char data29_offset;
+	unsigned char data29_size;
+	unsigned char data29_data[F12_FINGERS_TO_SUPPORT * 2];
 	unsigned char ctrl20_offset;
 };
 
@@ -234,6 +256,30 @@ struct synaptics_rmi4_fn {
 };
 
 /*
+ * struct synaptics_rmi4_input_settings - current input settings
+ * @num_of_fingers: maximum number of fingers for 2D touch
+ * @valid_button_count: number of valid 0D buttons
+ * @max_touch_width: maximum touch width
+ * @sensor_max_x: maximum x coordinate for 2D touch
+ * @sensor_max_y: maximum y coordinate for 2D touch
+ * @force_min: minimum force value
+ * @force_max: maximum force value
+ * @stylus_enable: flag to indicate reporting of stylus data
+ * @eraser_enable: flag to indicate reporting of eraser data
+ */
+struct synaptics_rmi4_input_settings {
+	unsigned char num_of_fingers;
+	unsigned char valid_button_count;
+	unsigned char max_touch_width;
+	int sensor_max_x;
+	int sensor_max_y;
+	int force_min;
+	int force_max;
+	bool stylus_enable;
+	bool eraser_enable;
+};
+
+/*
  * struct synaptics_rmi4_device_info - device information
  * @version_major: RMI protocol major version number
  * @version_minor: RMI protocol minor version number
@@ -255,11 +301,6 @@ struct synaptics_rmi4_device_info {
 	struct list_head support_fn_list;
 };
 
-struct rmi_config_id {
-	__u8 chip_type;
-	__u8 sensor;
-	__u16 fw_ver;
-};
 /*
  * struct synaptics_rmi4_data - RMI4 device instance data
  * @pdev: pointer to platform device
@@ -274,6 +315,7 @@ struct rmi_config_id {
  * @rmi4_report_mutex: mutex for input event reporting
  * @rmi4_io_ctrl_mutex: mutex for communication interface I/O
  * @rmi4_exp_init_mutex: mutex for expansion function module initialization
+ * @rmi4_irq_enable_mutex: mutex for enabling/disabling interrupt
  * @rb_work: work for rebuilding input device
  * @rb_workqueue: workqueue for rebuilding input device
  * @fb_notifier: framebuffer notifier client
@@ -286,6 +328,7 @@ struct rmi_config_id {
  * @num_of_rx: number of Rx channels for 2D touch
  * @num_of_fingers: maximum number of fingers for 2D touch
  * @max_touch_width: maximum touch width
+ * @valid_button_count: number of valid 0D buttons
  * @report_enable: input data to report for F$12
  * @no_sleep_setting: default setting of NoSleep in F01_RMI_CTRL00 register
  * @gesture_detection: detected gesture type and properties
@@ -296,10 +339,13 @@ struct rmi_config_id {
  * @f01_cmd_base_addr: command base address for f$01
  * @f01_ctrl_base_addr: control base address for f$01
  * @f01_data_base_addr: data base address for f$01
+ * @f51_query_base_addr: query base address for f$51
  * @firmware_id: firmware build ID
  * @irq: attention interrupt
  * @sensor_max_x: maximum x coordinate for 2D touch
  * @sensor_max_y: maximum y coordinate for 2D touch
+ * @force_min: minimum force value
+ * @force_max: maximum force value
  * @flash_prog_mode: flag to indicate flash programming mode status
  * @irq_enabled: flag to indicate attention interrupt enable status
  * @fingers_on_2d: flag to indicate presence of fingers in 2D area
@@ -321,15 +367,12 @@ struct rmi_config_id {
  * @report_touch: pointer to touch reporting function
  */
 struct synaptics_rmi4_data {
-	struct pinctrl *ts_pinctrl;
-	struct pinctrl_state *gpio_state_active;
-	struct pinctrl_state *gpio_state_suspend;
 	struct platform_device *pdev;
 	struct input_dev *input_dev;
-	struct i2c_client *i2c_client;
 	struct input_dev *stylus_dev;
 	const struct synaptics_dsx_hw_interface *hw_if;
 	struct synaptics_rmi4_device_info rmi4_mod_info;
+	struct synaptics_rmi4_input_settings input_settings;
 	struct kobject *board_prop_dir;
 	struct regulator *pwr_reg;
 	struct regulator *bus_reg;
@@ -338,15 +381,16 @@ struct synaptics_rmi4_data {
 	struct mutex rmi4_io_ctrl_mutex;
 	struct mutex rmi4_exp_init_mutex;
 	struct mutex rmi4_irq_enable_mutex;
-	struct mutex rmi4_hall_mutex;
 	struct delayed_work rb_work;
 	struct workqueue_struct *rb_workqueue;
-	struct work_struct  work;
-	struct rmi_config_id	config_id;
+	struct delayed_work ps_work;
+	struct workqueue_struct *ps_workqueue;
 #ifdef CONFIG_FB
 	struct notifier_block fb_notifier;
 	struct work_struct reset_work;
+	struct work_struct syna_irq_work;
 	struct workqueue_struct *reset_workqueue;
+	struct workqueue_struct *syna_irq_workqueue;
 #endif
 #ifdef CONFIG_HAS_EARLYSUSPEND
 	struct early_suspend early_suspend;
@@ -357,6 +401,7 @@ struct synaptics_rmi4_data {
 	unsigned char num_of_rx;
 	unsigned char num_of_fingers;
 	unsigned char max_touch_width;
+	unsigned char valid_button_count;
 	unsigned char report_enable;
 	unsigned char no_sleep_setting;
 	unsigned char gesture_detection[F12_GESTURE_DETECTION_LEN];
@@ -367,6 +412,10 @@ struct synaptics_rmi4_data {
 	unsigned short f01_cmd_base_addr;
 	unsigned short f01_ctrl_base_addr;
 	unsigned short f01_data_base_addr;
+	unsigned char firmware_information[4];
+	unsigned short f34_ctrl_base_addr;
+	unsigned short f34_query_base_addr;
+	unsigned short f34_data_base_addr;
 #ifdef F51_DISCRETE_FORCE
 	unsigned short f51_query_base_addr;
 #endif
@@ -374,6 +423,9 @@ struct synaptics_rmi4_data {
 	int irq;
 	int sensor_max_x;
 	int sensor_max_y;
+	int force_min;
+	int force_max;
+	int rebuild_flag;
 	bool flash_prog_mode;
 	bool irq_enabled;
 	bool fingers_on_2d;
@@ -382,14 +434,8 @@ struct synaptics_rmi4_data {
 	bool stay_awake;
 	bool fb_ready;
 	bool f11_wakeup_gesture;
-	bool f11_glove;
-	bool f11_smart_cover;
 	bool f12_wakeup_gesture;
-	bool f12_glove;
-	bool f12_smart_cover;
 	bool enable_wakeup_gesture;
-	bool enable_glove;
-	bool enable_smart_cover;
 	bool wedge_sensor;
 	bool report_pressure;
 	bool stylus_enable;
@@ -408,9 +454,9 @@ struct synaptics_rmi4_data {
 struct synaptics_dsx_bus_access {
 	unsigned char type;
 	int (*read)(struct synaptics_rmi4_data *rmi4_data, unsigned short addr,
-		unsigned char *data, unsigned short length);
+		unsigned char *data, unsigned int length);
 	int (*write)(struct synaptics_rmi4_data *rmi4_data, unsigned short addr,
-		unsigned char *data, unsigned short length);
+		unsigned char *data, unsigned int length);
 };
 
 struct synaptics_dsx_hw_interface {
@@ -434,20 +480,29 @@ struct synaptics_rmi4_exp_fn {
 			unsigned char intr_mask);
 };
 
-int synaptics_rmi4_bus_init(void);
+int synaptics_rmi4_bus_init_2nd(void);
 
-void synaptics_rmi4_bus_exit(void);
+void synaptics_rmi4_bus_exit_2nd(void);
 
-void synaptics_rmi4_new_function(struct synaptics_rmi4_exp_fn *exp_fn_module,
+void synaptics_rmi4_new_function_2nd(struct synaptics_rmi4_exp_fn *exp_fn_module,
 		bool insert);
 
-int synaptics_fw_updater(const unsigned char *fw_data);
+int synaptics_get_min_std_rawdata_2nd(short *min_rawdata);
+int synaptics_get_max_std_rawdata_2nd(short *max_rawdata);
+void synaptics_rmi4_suspend_public(unsigned int flag);
+char zte_ts_is_td4322(void);
+#ifdef CONFIG_BOARD_FUJISAN
+void zte_lcd_power_ctrl_func(int enable);
+#endif
+int synaptics_fw_updater_2nd(const unsigned char *fw_data);
+#define SYNA_INFO(fmt, arg...)           pr_info("<<SYNA2-INF>>[%s:%d] "fmt"", __func__, __LINE__, ##arg)
+#define SYNA_ERROR(fmt, arg...)          pr_info("<<SYNA2-ERR>>[%s:%d] "fmt"", __func__, __LINE__, ##arg)
 
 static inline int synaptics_rmi4_reg_read(
 		struct synaptics_rmi4_data *rmi4_data,
 		unsigned short addr,
 		unsigned char *data,
-		unsigned short len)
+		unsigned int len)
 {
 	return rmi4_data->hw_if->bus_access->read(rmi4_data, addr, data, len);
 }
@@ -456,7 +511,7 @@ static inline int synaptics_rmi4_reg_write(
 		struct synaptics_rmi4_data *rmi4_data,
 		unsigned short addr,
 		unsigned char *data,
-		unsigned short len)
+		unsigned int len)
 {
 	return rmi4_data->hw_if->bus_access->write(rmi4_data, addr, data, len);
 }

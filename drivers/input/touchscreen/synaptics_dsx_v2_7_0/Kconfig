@@ -1,31 +1,30 @@
 #
 # Synaptics DSX touchscreen driver configuration
 #
-menuconfig TOUCHSCREEN_SYNAPTICS_DSX
+menuconfig TOUCHSCREEN_SYNAPTICS_DSX_V27
 	bool "Synaptics DSX touchscreen"
 	help
 	  Say Y here if you have a Synaptics DSX touchscreen connected
 	  to your system.
-
 	  If unsure, say N.
 
-if TOUCHSCREEN_SYNAPTICS_DSX
+if TOUCHSCREEN_SYNAPTICS_DSX_V27
 
 choice
-	default TOUCHSCREEN_SYNAPTICS_DSX_I2C
+	default TOUCHSCREEN_SYNAPTICS_DSX_I2C_V27
 	prompt "Synaptics DSX bus interface"
-config TOUCHSCREEN_SYNAPTICS_DSX_I2C
+config TOUCHSCREEN_SYNAPTICS_DSX_I2C_V27
 	bool "RMI over I2C"
 	depends on I2C
-config TOUCHSCREEN_SYNAPTICS_DSX_SPI
+config TOUCHSCREEN_SYNAPTICS_DSX_SPI_V27
 	bool "RMI over SPI"
 	depends on SPI_MASTER
-config TOUCHSCREEN_SYNAPTICS_DSX_RMI_HID_I2C
+config TOUCHSCREEN_SYNAPTICS_DSX_RMI_HID_I2C_V27
 	bool "HID over I2C"
 	depends on I2C
 endchoice
 
-config TOUCHSCREEN_SYNAPTICS_DSX_CORE
+config TOUCHSCREEN_SYNAPTICS_DSX_CORE_V27
 	tristate "Synaptics DSX core driver module"
 	depends on I2C || SPI_MASTER
 	help
@@ -36,9 +35,9 @@ config TOUCHSCREEN_SYNAPTICS_DSX_CORE
 	  To compile this driver as a module, choose M here: the
 	  module will be called synaptics_dsx_core.
 
-config TOUCHSCREEN_SYNAPTICS_DSX_RMI_DEV
+config TOUCHSCREEN_SYNAPTICS_DSX_RMI_DEV_V27
 	tristate "Synaptics DSX RMI device module"
-	depends on TOUCHSCREEN_SYNAPTICS_DSX_CORE
+	depends on TOUCHSCREEN_SYNAPTICS_DSX_CORE_V27
 	help
 	  Say Y here to enable support for direct RMI register access.
 
@@ -47,9 +46,9 @@ config TOUCHSCREEN_SYNAPTICS_DSX_RMI_DEV
 	  To compile this driver as a module, choose M here: the
 	  module will be called synaptics_dsx_rmi_dev.
 
-config TOUCHSCREEN_SYNAPTICS_DSX_FW_UPDATE
+config TOUCHSCREEN_SYNAPTICS_DSX_FW_UPDATE_V27
 	tristate "Synaptics DSX firmware update module"
-	depends on TOUCHSCREEN_SYNAPTICS_DSX_CORE
+	depends on TOUCHSCREEN_SYNAPTICS_DSX_CORE_V27
 	help
 	  Say Y here to enable support for doing firmware update.
 
@@ -58,9 +57,9 @@ config TOUCHSCREEN_SYNAPTICS_DSX_FW_UPDATE
 	  To compile this driver as a module, choose M here: the
 	  module will be called synaptics_dsx_fw_update.
 
-config TOUCHSCREEN_SYNAPTICS_DSX_TEST_REPORTING
+config TOUCHSCREEN_SYNAPTICS_DSX_TEST_REPORTING_V27
 	tristate "Synaptics DSX test reporting module"
-	depends on TOUCHSCREEN_SYNAPTICS_DSX_CORE
+	depends on TOUCHSCREEN_SYNAPTICS_DSX_CORE_V27
 	help
 	  Say Y here to enable support for retrieving production test reports.
 
@@ -69,9 +68,9 @@ config TOUCHSCREEN_SYNAPTICS_DSX_TEST_REPORTING
 	  To compile this driver as a module, choose M here: the
 	  module will be called synaptics_dsx_test_reporting.
 
-config TOUCHSCREEN_SYNAPTICS_DSX_PROXIMITY
+config TOUCHSCREEN_SYNAPTICS_DSX_PROXIMITY_V27
 	tristate "Synaptics DSX proximity module"
-	depends on TOUCHSCREEN_SYNAPTICS_DSX_CORE
+	depends on TOUCHSCREEN_SYNAPTICS_DSX_CORE_V27
 	help
 	  Say Y here to enable support for proximity functionality.
 
@@ -80,9 +79,9 @@ config TOUCHSCREEN_SYNAPTICS_DSX_PROXIMITY
 	  To compile this driver as a module, choose M here: the
 	  module will be called synaptics_dsx_proximity.
 
-config TOUCHSCREEN_SYNAPTICS_DSX_ACTIVE_PEN
+config TOUCHSCREEN_SYNAPTICS_DSX_ACTIVE_PEN_V27
 	tristate "Synaptics DSX active pen module"
-	depends on TOUCHSCREEN_SYNAPTICS_DSX_CORE
+	depends on TOUCHSCREEN_SYNAPTICS_DSX_CORE_V27
 	help
 	  Say Y here to enable support for active pen functionality.
 
@@ -91,9 +90,9 @@ config TOUCHSCREEN_SYNAPTICS_DSX_ACTIVE_PEN
 	  To compile this driver as a module, choose M here: the
 	  module will be called synaptics_dsx_active_pen.
 
-config TOUCHSCREEN_SYNAPTICS_DSX_GESTURE
+config TOUCHSCREEN_SYNAPTICS_DSX_GESTURE_V27
 	tristate "Synaptics DSX user defined gesture module"
-	depends on TOUCHSCREEN_SYNAPTICS_DSX_CORE
+	depends on TOUCHSCREEN_SYNAPTICS_DSX_CORE_V27
 	help
 	  Say Y here to enable support for user defined gesture functionality.
 
@@ -102,9 +101,9 @@ config TOUCHSCREEN_SYNAPTICS_DSX_GESTURE
 	  To compile this driver as a module, choose M here: the
 	  module will be called synaptics_dsx_gesture.
 
-config TOUCHSCREEN_SYNAPTICS_DSX_VIDEO
+config TOUCHSCREEN_SYNAPTICS_DSX_VIDEO_V27
 	tristate "Synaptics DSX video module"
-	depends on TOUCHSCREEN_SYNAPTICS_DSX_CORE
+	depends on TOUCHSCREEN_SYNAPTICS_DSX_CORE_V27
 	help
 	  Say Y here to enable support for video communication functionality.
 
@@ -112,5 +111,16 @@ config TOUCHSCREEN_SYNAPTICS_DSX_VIDEO
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called synaptics_dsx_video.
+
+config TOUCHSCREEN_SYNAPTICS_DSX_DEBUG_V27
+	tristate "Synaptics DSX debug module"
+	depends on TOUCHSCREEN_SYNAPTICS_DSX_CORE_V27
+	help
+	  Say Y here to enable support for firmware debug functionality.
+
+	  If unsure, say N.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called synaptics_dsx_debug.
 
 endif
