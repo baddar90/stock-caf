@@ -923,6 +923,11 @@ static int dwc3_probe(struct platform_device *pdev)
 	if (dwc->maximum_speed == USB_SPEED_UNKNOWN)
 		dwc->maximum_speed = USB_SPEED_SUPER;
 
+	/*As it does not support super-speed on download mode,
+		*restrict usb high-speed on ftm, to facilitate download*/
+	if (strnstr(saved_command_line, "androidboot.mode=ftm", sizeof(saved_command_line)))
+		dwc->maximum_speed = USB_SPEED_HIGH;
+
 	dwc->lpm_nyet_threshold = lpm_nyet_threshold;
 
 	dwc->hird_threshold = hird_threshold
