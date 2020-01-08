@@ -1,7 +1,7 @@
 /*
  * Synaptics DSX touchscreen driver
  *
- * Copyright (C) 2012-2015 Synaptics Incorporated. All rights reserved.
+ * Copyright (C) 2012-2016 Synaptics Incorporated. All rights reserved.
  *
  * Copyright (C) 2012 Alexandra Chin <alexandra.chin@tw.synaptics.com>
  * Copyright (C) 2012 Scott Lin <scott.lin@tw.synaptics.com>
@@ -38,7 +38,7 @@
 #include <linux/delay.h>
 #include <linux/input.h>
 #include <linux/platform_device.h>
-#include <linux/input/synaptics_dsx_v2_6.h>
+#include <linux/input/synaptics_dsx_v2_7_0_2nd.h>
 #include "synaptics_dsx_core.h"
 
 #define PROX_PHYS_NAME "synaptics_dsx/proximity"
@@ -54,7 +54,7 @@ static ssize_t synaptics_rmi4_hover_finger_en_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count);
 
 static struct device_attribute attrs[] = {
-	__ATTR(hover_finger_en, (S_IRUGO | S_IWUGO),
+	__ATTR(hover_finger_en_2nd, (S_IRUGO | S_IWUGO),
 			synaptics_rmi4_hover_finger_en_show,
 			synaptics_rmi4_hover_finger_en_store),
 };
@@ -157,7 +157,7 @@ static void prox_hover_finger_lift(void)
 	input_sync(prox->prox_dev);
 	prox->hover_finger_present = false;
 
-	return;
+
 }
 
 static void prox_hover_finger_report(void)
@@ -207,7 +207,7 @@ static void prox_hover_finger_report(void)
 
 	prox->hover_finger_present = true;
 
-	return;
+
 }
 
 static int prox_set_hover_finger_en(void)
@@ -255,7 +255,7 @@ static void prox_set_params(void)
 	input_set_abs_params(prox->prox_dev, ABS_DISTANCE, 0,
 			HOVER_Z_MAX, 0, 0);
 
-	return;
+
 }
 
 static int prox_reg_init(void)
@@ -345,7 +345,6 @@ static int prox_scan_pdt(void)
 				switch (fd.fn_number) {
 				case SYNAPTICS_RMI4_F12:
 					goto f12_found;
-					break;
 				}
 			} else {
 				break;
@@ -442,7 +441,7 @@ static ssize_t synaptics_rmi4_hover_finger_en_store(struct device *dev,
 	return count;
 }
 
-int synaptics_rmi4_prox_hover_finger_en(bool enable)
+int synaptics_rmi4_prox_hover_finger_en_2nd(bool enable)
 {
 	int retval;
 
@@ -457,7 +456,7 @@ int synaptics_rmi4_prox_hover_finger_en(bool enable)
 
 	return 0;
 }
-EXPORT_SYMBOL(synaptics_rmi4_prox_hover_finger_en);
+EXPORT_SYMBOL(synaptics_rmi4_prox_hover_finger_en_2nd);
 
 static void synaptics_rmi4_prox_attn(struct synaptics_rmi4_data *rmi4_data,
 		unsigned char intr_mask)
@@ -468,7 +467,7 @@ static void synaptics_rmi4_prox_attn(struct synaptics_rmi4_data *rmi4_data,
 	if (prox->intr_mask & intr_mask)
 		prox_hover_finger_report();
 
-	return;
+
 }
 
 static int synaptics_rmi4_prox_init(struct synaptics_rmi4_data *rmi4_data)
@@ -564,8 +563,6 @@ exit_free_sysfs:
 	for (attr_count--; attr_count >= 0; attr_count--) {
 		sysfs_remove_file(&rmi4_data->input_dev->dev.kobj,
 				&attrs[attr_count].attr);
-		if (attr_count == 0)
-			break;
 	}
 
 	input_unregister_device(prox->prox_dev);
@@ -606,7 +603,7 @@ static void synaptics_rmi4_prox_remove(struct synaptics_rmi4_data *rmi4_data)
 exit:
 	complete(&prox_remove_complete);
 
-	return;
+
 }
 
 static void synaptics_rmi4_prox_reset(struct synaptics_rmi4_data *rmi4_data)
@@ -622,7 +619,7 @@ static void synaptics_rmi4_prox_reset(struct synaptics_rmi4_data *rmi4_data)
 
 	prox_set_hover_finger_en();
 
-	return;
+
 }
 
 static void synaptics_rmi4_prox_reinit(struct synaptics_rmi4_data *rmi4_data)
@@ -634,7 +631,7 @@ static void synaptics_rmi4_prox_reinit(struct synaptics_rmi4_data *rmi4_data)
 
 	prox_set_hover_finger_en();
 
-	return;
+
 }
 
 static void synaptics_rmi4_prox_e_suspend(struct synaptics_rmi4_data *rmi4_data)
@@ -644,7 +641,7 @@ static void synaptics_rmi4_prox_e_suspend(struct synaptics_rmi4_data *rmi4_data)
 
 	prox_hover_finger_lift();
 
-	return;
+
 }
 
 static void synaptics_rmi4_prox_suspend(struct synaptics_rmi4_data *rmi4_data)
@@ -654,7 +651,7 @@ static void synaptics_rmi4_prox_suspend(struct synaptics_rmi4_data *rmi4_data)
 
 	prox_hover_finger_lift();
 
-	return;
+
 }
 
 static struct synaptics_rmi4_exp_fn proximity_module = {
@@ -672,18 +669,18 @@ static struct synaptics_rmi4_exp_fn proximity_module = {
 
 static int __init rmi4_proximity_module_init(void)
 {
-	synaptics_rmi4_new_function(&proximity_module, true);
+	synaptics_rmi4_new_function_2nd(&proximity_module, true);
 
 	return 0;
 }
 
 static void __exit rmi4_proximity_module_exit(void)
 {
-	synaptics_rmi4_new_function(&proximity_module, false);
+	synaptics_rmi4_new_function_2nd(&proximity_module, false);
 
 	wait_for_completion(&prox_remove_complete);
 
-	return;
+
 }
 
 module_init(rmi4_proximity_module_init);

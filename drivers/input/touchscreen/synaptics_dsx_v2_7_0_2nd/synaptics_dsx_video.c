@@ -1,7 +1,7 @@
 /*
  * Synaptics DSX touchscreen driver
  *
- * Copyright (C) 2012-2015 Synaptics Incorporated. All rights reserved.
+ * Copyright (C) 2012-2016 Synaptics Incorporated. All rights reserved.
  *
  * Copyright (C) 2012 Alexandra Chin <alexandra.chin@tw.synaptics.com>
  * Copyright (C) 2012 Scott Lin <scott.lin@tw.synaptics.com>
@@ -37,7 +37,7 @@
 #include <linux/delay.h>
 #include <linux/input.h>
 #include <linux/platform_device.h>
-#include <linux/input/synaptics_dsx_v2_6.h>
+#include <linux/input/synaptics_dsx_v2_7_0_2nd.h>
 #include "synaptics_dsx_core.h"
 
 #define SYSFS_FOLDER_NAME "video"
@@ -112,11 +112,11 @@ static struct dcs_command resume_sequence[] = {
 #endif
 
 static struct device_attribute attrs[] = {
-	__ATTR(dcs_write, S_IWUGO,
-			NULL,
+	__ATTR(dcs_write, (S_IWUSR | S_IWGRP),
+			synaptics_rmi4_show_error,
 			video_sysfs_dcs_write_store),
-	__ATTR(param, S_IWUGO,
-			NULL,
+	__ATTR(param, (S_IWUSR | S_IWGRP),
+			synaptics_rmi4_show_error,
 			video_sysfs_param_store),
 };
 
@@ -283,11 +283,8 @@ static int synaptics_rmi4_video_init(struct synaptics_rmi4_data *rmi4_data)
 	return 0;
 
 exit_sysfs_attrs:
-	for (attr_count--; attr_count >= 0; attr_count--) {
+	for (attr_count--; attr_count >= 0; attr_count--)
 		sysfs_remove_file(video->sysfs_dir, &attrs[attr_count].attr);
-		if (attr_count == 0)
-			break;
-	}
 
 	kobject_put(video->sysfs_dir);
 
@@ -318,7 +315,7 @@ static void synaptics_rmi4_video_remove(struct synaptics_rmi4_data *rmi4_data)
 exit:
 	complete(&video_remove_complete);
 
-	return;
+
 }
 
 static void synaptics_rmi4_video_reset(struct synaptics_rmi4_data *rmi4_data)
@@ -326,7 +323,7 @@ static void synaptics_rmi4_video_reset(struct synaptics_rmi4_data *rmi4_data)
 	if (!video)
 		synaptics_rmi4_video_init(rmi4_data);
 
-	return;
+
 }
 
 #ifdef RMI_DCS_SUSPEND_RESUME
@@ -350,7 +347,7 @@ static void synaptics_rmi4_video_suspend(struct synaptics_rmi4_data *rmi4_data)
 		msleep(suspend_sequence[ii].wait_time);
 	}
 
-	return;
+
 }
 
 static void synaptics_rmi4_video_resume(struct synaptics_rmi4_data *rmi4_data)
@@ -373,7 +370,7 @@ static void synaptics_rmi4_video_resume(struct synaptics_rmi4_data *rmi4_data)
 		msleep(resume_sequence[ii].wait_time);
 	}
 
-	return;
+
 }
 #endif
 
@@ -397,18 +394,18 @@ static struct synaptics_rmi4_exp_fn video_module = {
 
 static int __init rmi4_video_module_init(void)
 {
-	synaptics_rmi4_new_function(&video_module, true);
+	synaptics_rmi4_new_function_2nd(&video_module, true);
 
 	return 0;
 }
 
 static void __exit rmi4_video_module_exit(void)
 {
-	synaptics_rmi4_new_function(&video_module, false);
+	synaptics_rmi4_new_function_2nd(&video_module, false);
 
 	wait_for_completion(&video_remove_complete);
 
-	return;
+
 }
 
 module_init(rmi4_video_module_init);
