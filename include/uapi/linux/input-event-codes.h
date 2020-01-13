@@ -342,6 +342,8 @@
 #define KEY_HALL_SENSOR_UP	 250
 /* add end by zte_pm for Hall sensor driver*/
 
+#define KEY_PTTBTN      251 /* PTT HEADSET Button */
+
 /* Code 255 is reserved for special needs of AT keyboard driver */
 
 #define BTN_MISC		0x100
