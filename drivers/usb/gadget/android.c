@@ -2355,7 +2355,6 @@ static int serial_function_bind_config(struct android_usb_function *f,
 	} else
 		strlcpy(buf, serial_transports, sizeof(buf));
 
->>>>>>> 03124da64988... Add USB modifications
 	b = strim(buf);
 
 	strlcpy(xport_name_buf, serial_xport_names, sizeof(xport_name_buf));
