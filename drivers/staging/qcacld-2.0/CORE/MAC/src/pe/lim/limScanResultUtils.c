@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2019 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -134,7 +134,73 @@ limDeactivateMinChannelTimerDuringScan(tpAniSirGlobal pMac)
     return eSIR_SUCCESS;
 } /*** end limDeactivateMinChannelTimerDuringScan() ***/
 
+void
+lim_update_max_txpower_ind(tpAniSirGlobal mac_ptr, tpPESession session_ptr)
+{
+	tSirMsgQ  mmh_msg;
 
+	limLog(mac_ptr, LOG1, FL("update max pwr in country code: %c%c"),
+	       mac_ptr->scan.countryCodeCurrent[0],
+	       mac_ptr->scan.countryCodeCurrent[1]);
+
+	mmh_msg.type = eWNI_SME_UPDATE_PWR_IND;
+	mmh_msg.bodyptr = NULL;
+	mmh_msg.bodyval = session_ptr->peSessionId;
+	limSysProcessMmhMsgApi(mac_ptr, &mmh_msg, ePROT);
+	return;
+}
+
+/**
+ * lim_check_and_change_cc: indicate upper layer country code changed
+ * @mac_ptr: Pointer to Global MAC structure
+ * @beacon_ptr: pointer to beacon
+ * @session_ptr: pointer to session
+ *
+ * @Return: None
+ */
+void
+lim_check_and_change_cc(tpAniSirGlobal mac_ptr,
+			tpSirProbeRespBeacon beacon_ptr,
+			tpPESession session_ptr)
+{
+	tSirMsgQ  mmh_msg;
+	tANI_U16  msg_len = 0;
+	struct sme_change_country_code_ind *change_cc_ind_ptr = NULL;
+	v_BOOL_t country_code_not_changed;
+
+	limLog(mac_ptr, LOG1, FL("enter new cc %c%c  old cc: %c%c"),
+	       beacon_ptr->countryInfoParam.countryString[0],
+	       beacon_ptr->countryInfoParam.countryString[1],
+	       mac_ptr->scan.countryCodeCurrent[0],
+	       mac_ptr->scan.countryCodeCurrent[1]);
+
+	country_code_not_changed =
+		vos_mem_compare(beacon_ptr->countryInfoParam.countryString,
+				mac_ptr->scan.countryCodeCurrent,
+				VOS_COUNTRY_CODE_LEN);
+	if (FALSE == country_code_not_changed) {
+		msg_len = sizeof(*change_cc_ind_ptr);
+		change_cc_ind_ptr = vos_mem_malloc(msg_len);
+		if (NULL == change_cc_ind_ptr) {
+			limLog(mac_ptr, LOGE, FL("Mem alloc failed"));
+			return;
+		}
+
+		change_cc_ind_ptr->message_type = eWNI_SME_CC_CHANGE_IND;
+		change_cc_ind_ptr->msg_len = msg_len;
+		change_cc_ind_ptr->session_id = session_ptr->smeSessionId;
+		memcpy(change_cc_ind_ptr->country_code,
+		       beacon_ptr->countryInfoParam.countryString,
+		       VOS_COUNTRY_CODE_LEN);
+
+		mmh_msg.type = eWNI_SME_CC_CHANGE_IND;
+		mmh_msg.bodyptr = change_cc_ind_ptr;
+		mmh_msg.bodyval = 0;
+		limSysProcessMmhMsgApi(mac_ptr, &mmh_msg, ePROT);
+
+		return;
+	}
+}
 
 /**
  * limCollectBssDescription()
@@ -542,7 +608,7 @@ limCheckAndAddBssDescription(tpAniSirGlobal pMac,
      */
 
     ieLen = WDA_GET_RX_PAYLOAD_LEN(pRxPacketInfo);
-    if (ieLen <= SIR_MAC_B_PR_SSID_OFFSET)
+    if (ieLen <= (SIR_MAC_B_PR_SSID_OFFSET + 2))
     {
         limLog(pMac, LOGP,
                FL("RX packet has invalid length %d"), ieLen);
@@ -593,18 +659,21 @@ limCheckAndAddBssDescription(tpAniSirGlobal pMac,
        limLog(pMac, LOG1, FL(" pHdr->addr3:"MAC_ADDRESS_STR),
               MAC_ADDR_ARRAY(pHdr->addr3));
        limLog( pMac, LOG1, FL("Save this entry in LFR cache"));
-       status = limLookupNaddLfrHashEntry(pMac, pBssDescr, LIM_HASH_ADD, dontUpdateAll);
+       status = limLookupNaddLfrHashEntry(pMac, pBssDescr, LIM_HASH_ADD,
+                                          dontUpdateAll, ieLen - 2);
     }
     else
 #endif
     //If it is not scanning, only save unique results
     if (pMac->lim.gLimReturnUniqueResults || (!fScanning))
     {
-        status = limLookupNaddHashEntry(pMac, pBssDescr, LIM_HASH_UPDATE, dontUpdateAll);
+        status = limLookupNaddHashEntry(pMac, pBssDescr, LIM_HASH_UPDATE,
+                                        dontUpdateAll, ieLen - 2);
     }
     else
     {
-        status = limLookupNaddHashEntry(pMac, pBssDescr, LIM_HASH_ADD, dontUpdateAll);
+        status = limLookupNaddHashEntry(pMac, pBssDescr, LIM_HASH_ADD,
+                                        dontUpdateAll, ieLen - 2);
     }
 
     if(fScanning)
@@ -745,7 +814,7 @@ limInitHashTable(tpAniSirGlobal pMac)
 eHalStatus
 limLookupNaddHashEntry(tpAniSirGlobal pMac,
                        tLimScanResultNode *pBssDescr, tANI_U8 action,
-                       tANI_U8 dontUpdateAll)
+                       tANI_U8 dontUpdateAll, tANI_U32 ie_len)
 {
     tANI_U8                  index, ssidLen = 0;
     tANI_U8                found = false;
@@ -761,6 +830,11 @@ limLookupNaddHashEntry(tpAniSirGlobal pMac,
 
     //ieFields start with TLV of SSID IE
     ssidLen = * ((tANI_U8 *) &pBssDescr->bssDescription.ieFields + 1);
+    if ((ssidLen > ie_len) || (ssidLen > DOT11F_IE_SSID_MAX_LEN)) {
+        limLog(pMac, LOGE, FL("SSID length %d, IE overall Length %d"),
+               ssidLen, ie_len);
+        return eHAL_STATUS_FAILURE;
+    }
     pSirCap = (tSirMacCapabilityInfo *)&pBssDescr->bssDescription.capabilityInfo;
 
     for (pprev = ptemp; ptemp; pprev = ptemp, ptemp = ptemp->next)
@@ -774,6 +848,8 @@ limLookupNaddHashEntry(tpAniSirGlobal pMac,
              // matching band to update new channel info
             (vos_chan_to_band(pBssDescr->bssDescription.channelId) ==
                       vos_chan_to_band(ptemp->bssDescription.channelId)) &&
+            (*((tANI_U8 *) &pBssDescr->bssDescription.ieFields + 1) ==
+                *((tANI_U8 *) &ptemp->bssDescription.ieFields + 1)) &&
             vos_mem_compare( ((tANI_U8 *) &pBssDescr->bssDescription.ieFields + 1),
                            ((tANI_U8 *) &ptemp->bssDescription.ieFields + 1),
                            (tANI_U8) (ssidLen + 1)) &&
@@ -984,9 +1060,9 @@ limInitLfrHashTable(tpAniSirGlobal pMac)
 eHalStatus
 limLookupNaddLfrHashEntry(tpAniSirGlobal pMac,
                           tLimScanResultNode *pBssDescr, tANI_U8 action,
-                          tANI_U8 dontUpdateAll)
+                          tANI_U8 dontUpdateAll, tANI_U32 ie_len)
 {
-    tANI_U8                  index, ssidLen = 0;
+    tANI_U8 index, ssidLen = 0;
     tLimScanResultNode *ptemp, *pprev;
     tSirMacCapabilityInfo *pSirCap, *pSirCapTemp;
     int idx, len;
@@ -999,6 +1075,11 @@ limLookupNaddLfrHashEntry(tpAniSirGlobal pMac,
 
     //ieFields start with TLV of SSID IE
     ssidLen = * ((tANI_U8 *) &pBssDescr->bssDescription.ieFields + 1);
+    if ((ssidLen > ie_len) || (ssidLen > DOT11F_IE_SSID_MAX_LEN)) {
+        limLog(pMac, LOGE, FL("SSID length %d, IE overall Length %d"),
+               ssidLen, ie_len);
+        return eHAL_STATUS_FAILURE;
+    }
     pSirCap = (tSirMacCapabilityInfo *)&pBssDescr->bssDescription.capabilityInfo;
 
     for (pprev = ptemp; ptemp; pprev = ptemp, ptemp = ptemp->next)
@@ -1011,6 +1092,8 @@ limLookupNaddLfrHashEntry(tpAniSirGlobal pMac,
                       sizeof(tSirMacAddr))) &&   //matching BSSID
             (pBssDescr->bssDescription.channelId ==
                                       ptemp->bssDescription.channelId) &&
+            (*((tANI_U8 *) &pBssDescr->bssDescription.ieFields + 1) ==
+                *((tANI_U8 *) &ptemp->bssDescription.ieFields + 1)) &&
             vos_mem_compare( ((tANI_U8 *) &pBssDescr->bssDescription.ieFields + 1),
                            ((tANI_U8 *) &ptemp->bssDescription.ieFields + 1),
                            (tANI_U8) (ssidLen + 1)) &&

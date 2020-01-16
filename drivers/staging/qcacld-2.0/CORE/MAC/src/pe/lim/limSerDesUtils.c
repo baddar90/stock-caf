@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2019 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -127,9 +127,9 @@ limGetBssDescription( tpAniSirGlobal pMac, tSirBssDescription *pBssDescription,
 
     // Extract timer
     vos_mem_copy( (tANI_U8 *) (&pBssDescription->scansystimensec),
-                               pBuf, sizeof(v_TIME_t));
-    pBuf += sizeof(v_TIME_t);
-    len  -= sizeof(v_TIME_t);
+                               pBuf, sizeof(pBssDescription->scansystimensec));
+    pBuf += sizeof(pBssDescription->scansystimensec);
+    len  -= sizeof(pBssDescription->scansystimensec);
     if (limCheckRemainingLength(pMac, len) == eSIR_FAILURE)
         return eSIR_FAILURE;
 
@@ -941,6 +941,13 @@ limJoinReqSerDes(tpAniSirGlobal pMac, tpSirSmeJoinReq pJoinReq, tANI_U8 *pBuf)
 
     // Extract bssPersona
     pJoinReq->staPersona = *pBuf++;
+    len--;
+    if (limCheckRemainingLength(pMac, len) == eSIR_FAILURE)
+    {
+        limLog(pMac, LOGE, FL("remaining len %d is too short"), len);
+        return eSIR_FAILURE;
+    }
+    pJoinReq->sae_pmk_cached = *pBuf++;
     len--;
     if (limCheckRemainingLength(pMac, len) == eSIR_FAILURE)
     {

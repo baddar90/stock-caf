@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -53,6 +53,12 @@
 #include "regdomain.h"
 #include "regdomain_common.h"
 #include "vos_cnss.h"
+#include "limSession.h"
+#include "limScanResultUtils.h"
+#ifdef CLD_REGDB
+#include "regdb.h"
+#include <net/regulatory.h>
+#endif
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(3,9,0)) && !defined(WITH_BACKPORTS)
 #define IEEE80211_CHAN_NO_80MHZ		1<<7
@@ -119,6 +125,8 @@ static v_BOOL_t init_by_reg_core = VOS_FALSE;
 #define WORLD_SKU_MASK          0x00F0
 #define WORLD_SKU_PREFIX        0x0060
 
+#define REG_SET_WAIT_MS        100
+
 /**
  * struct bonded_chan
  * @start_ch: start channel
@@ -141,7 +149,8 @@ static const struct bonded_chan bonded_chan_40mhz_array[] = {
 	{132, 136},
 	{140, 144},
 	{149, 153},
-	{157, 161}
+	{157, 161},
+	{165, 169}
 };
 
 static const struct bonded_chan bonded_chan_80mhz_array[] = {
@@ -289,7 +298,7 @@ chan_to_ht_40_index_map chan_to_ht_40_index[NUM_20MHZ_RF_CHANNELS] =
 static CountryInfoTable_t countryInfoTable =
 {
     /* the first entry in the table is always the world domain */
-    141,
+    142,
     {
       {REGDOMAIN_WORLD, {'0', '0'}}, // WORLD DOMAIN
       {REGDOMAIN_FCC, {'A', 'D'}}, // ANDORRA
@@ -372,6 +381,7 @@ static CountryInfoTable_t countryInfoTable =
       {REGDOMAIN_ETSI, {'M', 'A'}}, //MOROCCO
       {REGDOMAIN_ETSI, {'M', 'C'}}, //MONACO
       {REGDOMAIN_ETSI, {'M', 'K'}}, //MACEDONIA, THE FORMER YUGOSLAV REPUBLIC OF
+      {REGDOMAIN_ETSI, {'M', 'M'}}, //MYANMAR
       {REGDOMAIN_FCC, {'M','N'}}, //MONGOLIA
       {REGDOMAIN_FCC, {'M', 'O'}}, //MACAO
       {REGDOMAIN_FCC, {'M', 'P'}}, //NORTHERN MARIANA ISLANDS
@@ -530,6 +540,7 @@ const tRfChannelProps rfChannels[NUM_RF_CHANNELS] =
     { 5785, 157, RF_SUBBAND_5_HIGH_GHZ},     //RF_CHAN_157,
     { 5805, 161, RF_SUBBAND_5_HIGH_GHZ},     //RF_CHAN_161,
     { 5825, 165, RF_SUBBAND_5_HIGH_GHZ},     //RF_CHAN_165,
+    { 5845, 169, RF_SUBBAND_5_HIGH_GHZ},     //RF_CHAN_169,
 
     /* 5.9GHz 10 MHz bandwidth (802.11p) */
     { 5852, 170, RF_SUBBAND_5_HIGH_GHZ},     //RF_CHAN_170,
@@ -746,6 +757,17 @@ static int regd_init_wiphy(hdd_context_t *pHddCtx, struct regulatory *reg,
 	wiphy->flags = pHddCtx->reg.reg_flags;
 #endif
 
+#ifdef CLD_REGDB
+	/*
+	 * Set wiphy->regulatory_flags to REGULATORY_WIPHY_SELF_MANAGED
+	 * So kernel would not change wiphy channel flags.
+	 * Later wiphy->regulatory_flags would be changed by
+	 * __wlan_hdd_linux_reg_notifier.
+	 */
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,14,0)) || defined(WITH_BACKPORTS)
+	wiphy->regulatory_flags = REGULATORY_WIPHY_SELF_MANAGED;
+#endif
+#endif
 	return 0;
 }
 
@@ -974,7 +996,7 @@ static void vos_set_5g_channel_params(uint16_t oper_ch,
 				      struct ch_params_s *ch_params)
 {
 	eNVChannelEnabledType chan_state = NV_CHANNEL_ENABLE;
-	const struct bonded_chan *bonded_chan_ptr;
+	const struct bonded_chan *bonded_chan_ptr = NULL;
 	uint16_t center_chan;
 
 	if (CH_WIDTH_MAX <= ch_params->ch_width)
@@ -1537,6 +1559,10 @@ VOS_STATUS vos_nv_get_dfs_region(uint8_t *dfs_region)
 	return VOS_STATUS_SUCCESS;
 }
 
+#ifdef CLD_REGDB
+void __wlan_hdd_linux_reg_notifier(struct wiphy *wiphy,
+                                   struct regulatory_request *request);
+#endif
 /**------------------------------------------------------------------------
   \brief vos_nv_getRegDomainFromCountryCode() - get the regulatory domain of
   a country given its country code
@@ -1561,6 +1587,9 @@ VOS_STATUS vos_nv_getRegDomainFromCountryCode( v_REGDOMAIN_t *pRegDomain,
     struct wiphy *wiphy = NULL;
     int i;
     int wait_result;
+#ifdef CLD_REGDB
+    struct regulatory_request request;
+#endif
 
     /* sanity checks */
     if (NULL == pRegDomain)
@@ -1600,6 +1629,13 @@ VOS_STATUS vos_nv_getRegDomainFromCountryCode( v_REGDOMAIN_t *pRegDomain,
                    ("Invalid pHddCtx pointer") );
         return VOS_STATUS_E_FAULT;
     }
+
+#ifdef CLD_REGDB
+    request.alpha2[0] = pHddCtx->reg.alpha2[0];
+    request.alpha2[1] = pHddCtx->reg.alpha2[1];
+    request.initiator = NL80211_REGDOM_SET_BY_DRIVER;
+    request.dfs_region = 0;
+#endif
 
     if (pHddCtx->isLogpInProgress) {
         VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
@@ -1663,6 +1699,9 @@ VOS_STATUS vos_nv_getRegDomainFromCountryCode( v_REGDOMAIN_t *pRegDomain,
             regulatory_hint(wiphy, country_code);
             wait_for_completion_timeout(&pHddCtx->reg_init,
                                         msecs_to_jiffies(REG_WAIT_TIME));
+#ifdef CLD_REGDB
+            __wlan_hdd_linux_reg_notifier(wiphy, &request);
+#endif
         }
 
     } else if (COUNTRY_IE == source || COUNTRY_USER == source) {
@@ -1780,7 +1819,7 @@ bool vos_is_channel_support_sub20(uint16_t operation_channel,
 	eNVChannelEnabledType channel_state;
 
 	if (VOS_IS_CHANNEL_5GHZ(operation_channel)) {
-		const struct bonded_chan *bonded_chan_ptr;
+		const struct bonded_chan *bonded_chan_ptr = NULL;
 
 		channel_state =
 		    vos_search_5g_bonded_channel(operation_channel,
@@ -1912,6 +1951,118 @@ int vos_update_band(v_U8_t  band_capability)
 	return 0;
 }
 
+#ifdef CLD_REGDB
+
+/**
+ * freq_in_rule_band - tells us if a frequency is in a frequency band
+ * @freq_range: frequency rule we want to query
+ * @freq_khz: frequency we are inquiring about
+ *
+ * This lets us know if a specific frequency rule is or is not relevant to
+ * a specific frequency's band. Bands are device specific and artificial
+ * definitions (the "2.4 GHz band", the "5 GHz band" and the "60GHz band"),
+ * however it is safe for now to assume that a frequency rule should not be
+ * part of a frequency's band if the start freq or end freq are off by more
+ * than 2 GHz for the 2.4 and 5 GHz bands, and by more than 10 GHz for the
+ * 60 GHz band.
+ * This resolution can be lowered and should be considered as we add
+ * regulatory rule support for other "bands".
+ **/
+static bool freq_in_rule_band(const struct ieee80211_freq_range *freq_range,
+			      u32 freq_khz)
+{
+#define ONE_GHZ_IN_KHZ	1000000
+	/*
+	 * From 802.11ad: directional multi-gigabit (DMG):
+	 * Pertaining to operation in a frequency band containing a channel
+	 * with the Channel starting frequency above 45 GHz.
+	 */
+	u32 limit = freq_khz > 45 * ONE_GHZ_IN_KHZ ?
+			10 * ONE_GHZ_IN_KHZ : 2 * ONE_GHZ_IN_KHZ;
+	if (abs(freq_khz - freq_range->start_freq_khz) <= limit)
+		return true;
+	if (abs(freq_khz - freq_range->end_freq_khz) <= limit)
+		return true;
+	return false;
+#undef ONE_GHZ_IN_KHZ
+}
+
+static bool alpha2_equal(const char *alpha2_x, const char *alpha2_y)
+{
+	if (!alpha2_x || !alpha2_y)
+		return false;
+	return alpha2_x[0] == alpha2_y[0] && alpha2_x[1] == alpha2_y[1];
+}
+
+const struct ieee80211_regdomain* search_regd(const char* alpha2)
+{
+	const struct ieee80211_regdomain *curdom = NULL;
+	int i;
+
+	for (i = 0; i < reg_regdb_size; i++) {
+		curdom = reg_regdb[i];
+
+		if (alpha2_equal(alpha2, curdom->alpha2)) {
+			return curdom;
+		}
+	}
+	return NULL;
+}
+
+static bool reg_does_bw_fit(const struct ieee80211_freq_range *freq_range,
+			    u32 center_freq_khz, u32 bw_khz)
+{
+	u32 start_freq_khz, end_freq_khz;
+
+	start_freq_khz = center_freq_khz - (bw_khz/2);
+	end_freq_khz = center_freq_khz + (bw_khz/2);
+
+	if (start_freq_khz >= freq_range->start_freq_khz &&
+	    end_freq_khz <= freq_range->end_freq_khz)
+		return true;
+
+	return false;
+}
+
+static const struct ieee80211_reg_rule *
+freq_reg_info_regd(struct wiphy *wiphy, u32 center_freq,
+        const struct ieee80211_regdomain *regd)
+{
+	int i;
+	bool band_rule_found = false;
+	bool bw_fits = false;
+
+	if (!regd)
+		return ERR_PTR(-EINVAL);
+
+	for (i = 0; i < regd->n_reg_rules; i++) {
+		const struct ieee80211_reg_rule *rr;
+		const struct ieee80211_freq_range *fr = NULL;
+
+		rr = &regd->reg_rules[i];
+		fr = &rr->freq_range;
+
+		/*
+		 * We only need to know if one frequency rule was
+		 * was in center_freq's band, that's enough, so lets
+		 * not overwrite it once found
+		 */
+		if (!band_rule_found)
+			band_rule_found = freq_in_rule_band(fr, center_freq);
+
+		bw_fits = reg_does_bw_fit(fr, center_freq, MHZ_TO_KHZ(20));
+
+		if (band_rule_found && bw_fits)
+			return rr;
+	}
+
+	if (!band_rule_found)
+		return ERR_PTR(-ERANGE);
+
+	return ERR_PTR(-EINVAL);
+}
+#endif
+
 /* create_linux_regulatory_entry to populate internal structures from wiphy */
 static int create_linux_regulatory_entry(struct wiphy *wiphy,
                                          v_U8_t nBandCapability,
@@ -1925,6 +2076,9 @@ static int create_linux_regulatory_entry(struct wiphy *wiphy,
 	 int err;
 #endif
     const struct ieee80211_reg_rule *reg_rule;
+#ifdef CLD_REGDB
+    const struct ieee80211_regdomain* regd;
+#endif
     pVosContext = vos_get_global_context(VOS_MODULE_ID_SYS, NULL);
 
     if (NULL != pVosContext)
@@ -1994,8 +2148,14 @@ static int create_linux_regulatory_entry(struct wiphy *wiphy,
 #endif
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,9,0)) || defined(WITH_BACKPORTS)
-                reg_rule = freq_reg_info(wiphy, MHZ_TO_KHZ(wiphy->bands[i]->
-                                         channels[j].center_freq));
+#ifdef CLD_REGDB
+                regd = search_regd(pHddCtx->reg.alpha2);
+                reg_rule = freq_reg_info_regd(wiphy,
+                           MHZ_TO_KHZ(wiphy->bands[i]->channels[j].center_freq), regd);
+#else
+                reg_rule = freq_reg_info(wiphy,
+                           MHZ_TO_KHZ(wiphy->bands[i]->channels[j].center_freq));
+#endif
 #else
                 err = freq_reg_info(wiphy, MHZ_TO_KHZ(wiphy->bands[i]->
                                     channels[j].center_freq),
@@ -2144,13 +2304,27 @@ static int create_linux_regulatory_entry(struct wiphy *wiphy,
                    }
                 }
             } else {
-                /* Enable is only last flag we support */
-                pnvEFSTable->halnv.tables.regDomains[temp_reg_domain].
-                    channels[k].enabled = NV_CHANNEL_ENABLE;
+                /* there are 14 channel in hdd_channels_2_4_GHZ,
+                 * there are 24/25 hdd_channels_5_GHZ,
+                 * there are 2 channel in hdd_etsi_srd_chan
+                 * the last element of wiphy->bands[i]->channels[j]
+                 * is channel 173, and the index is 39/40.*/
+                if((!pHddCtx->cfg_ini->dot11p_mode) && (k > RF_CHAN_169)) {
+                   pnvEFSTable->halnv.tables.regDomains[temp_reg_domain].
+                       channels[RF_CHAN_173].enabled = NV_CHANNEL_ENABLE;
+                   pnvEFSTable->halnv.tables.regDomains[temp_reg_domain].
+                       channels[RF_CHAN_173].pwrLimit =
+                       (tANI_S8) ((wiphy->bands[i]->channels[j].max_power));
+                } else {
+                    /* Enable is only last flag we support */
+                    pnvEFSTable->halnv.tables.regDomains[temp_reg_domain].
+                        channels[k].enabled = NV_CHANNEL_ENABLE;
 
-                /* max_power is in dBm */
-                pnvEFSTable->halnv.tables.regDomains[temp_reg_domain].channels[k].pwrLimit =
-                    (tANI_S8) ((wiphy->bands[i]->channels[j].max_power));
+                    /* max_power is in dBm */
+                    pnvEFSTable->halnv.tables.regDomains[temp_reg_domain].
+                        channels[k].pwrLimit =
+                        (tANI_S8) ((wiphy->bands[i]->channels[j].max_power));
+                }
 
                 /* Disable the center channel if neither HT40+ nor HT40- is allowed
                  */
@@ -2264,6 +2438,44 @@ static void restore_custom_reg_settings(struct wiphy *wiphy)
 }
 #endif
 
+static void hdd_debug_cc_timer_expired_handler(void *arg)
+{
+	hdd_context_t *hdd_ctx_ptr = NULL;
+	tpAniSirGlobal mac_ptr = NULL;
+	tpPESession pesession = NULL;
+	uint32_t roam_session_id = 0;
+	uint8_t pe_session_id = 0;
+	VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO,
+		  ("%s ENTER "), __func__);
+
+	if (!arg)
+		return;
+	hdd_ctx_ptr = (hdd_context_t *)arg;
+	mac_ptr =  PMAC_STRUCT(hdd_ctx_ptr->hHal);
+	vos_timer_destroy(&(hdd_ctx_ptr->reg.reg_set_timer));
+	regdmn_set_regval(&hdd_ctx_ptr->reg);
+
+	if (vos_get_concurrency_mode() == VOS_STA ||
+	    vos_get_concurrency_mode() == VOS_STA_SAP)
+		for (roam_session_id = 0;
+		     roam_session_id < CSR_ROAM_SESSION_MAX;
+		     roam_session_id++) {
+		if (!CSR_IS_SESSION_VALID(mac_ptr, roam_session_id)) {
+			continue;
+		}
+		if (mac_ptr->roam.roamSession[roam_session_id].connectState ==
+		    eCSR_ASSOC_STATE_TYPE_INFRA_ASSOCIATED) {
+			pesession =
+			    peFindSessionByBssid(mac_ptr,
+						 mac_ptr->roam.roamSession[roam_session_id].connectedProfile.bssid,
+						 &pe_session_id);
+			if (pesession != NULL)
+				lim_update_max_txpower_ind(mac_ptr, pesession);
+			return;
+		}
+	}
+}
+
 /*
  * Function: wlan_hdd_linux_reg_notifier
  * This function is called from cfg80211 core to provide regulatory settings
@@ -2285,6 +2497,7 @@ int __wlan_hdd_linux_reg_notifier(struct wiphy *wiphy,
     int i;
     v_BOOL_t isVHT80Allowed;
     bool reset = false;
+    VOS_TIMER_STATE timer_status;
 
     VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO,
               FL("country: %c%c, initiator %d, dfs_region: %d"),
@@ -2453,8 +2666,27 @@ int __wlan_hdd_linux_reg_notifier(struct wiphy *wiphy,
                                          temp_reg_domain);
         }
 
-        /* send CTL info to firmware */
-        regdmn_set_regval(&pHddCtx->reg);
+        if (pHddCtx->cfg_ini->sta_change_cc_via_beacon) {
+            /* Due the firmware process, host side need to send
+             * WMI_SCAN_CHAN_LIST_CMDID before WMI_PDEV_SET_REGDOMAIN_CMDID, so
+             * that tx-power setting for operation channel can be applied,
+             * so use timer to postpone SET_REGDOMAIN_CMDID
+             */
+            if (pHddCtx->reg.reg_set_timer.state == 0)
+                timer_status = VOS_TIMER_STATE_UNUSED;
+            else {
+                do {
+                    timer_status =
+                    vos_timer_getCurrentState(&(pHddCtx->reg.reg_set_timer));
+                } while(timer_status != VOS_TIMER_STATE_UNUSED);
+            }
+            vos_timer_init(&(pHddCtx->reg.reg_set_timer), VOS_TIMER_TYPE_SW,
+                           hdd_debug_cc_timer_expired_handler,
+                           (void *)pHddCtx);
+            vos_timer_start(&(pHddCtx->reg.reg_set_timer), REG_SET_WAIT_MS);
+        } else {
+            regdmn_set_regval(&pHddCtx->reg);
+        }
 
         /* set dfs_region info */
         vos_nv_set_dfs_region(request->dfs_region);

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -72,6 +72,7 @@
 #include <vos_threads.h>
 #include <vos_timer.h>
 #include <vos_pack_align.h>
+#include <linux/firmware.h>
 
 #define VOS_WDA_TIMEOUT 15000
 
@@ -148,6 +149,25 @@ VOS_STATUS vos_wda_shutdown( v_CONTEXT_t vosContext );
 v_VOID_t *vos_get_context( VOS_MODULE_ID moduleId,
                            v_CONTEXT_t vosContext );
 
+/**---------------------------------------------------------------------------
+
+  \brief vos_set_context() - set context for specified module
+
+  Each module in the system has a context / data area that is allocated
+  and maanged by voss.  This API allows any user to set the context data
+  area in the VOSS global context.
+
+  \param module_id - the module ID, who's context data are is being changed.
+
+  \param mod_context - context data area of the specified module.
+
+  \return VOS_STATUS_SUCCESS - context was successfully changed.
+
+          VOS_STATUS_E_INVAL - global context is null or module id is invalid.
+
+  --------------------------------------------------------------------------*/
+VOS_STATUS vos_set_context(VOS_MODULE_ID module_id,
+                           v_PVOID_t mod_context);
 
 /**---------------------------------------------------------------------------
 
@@ -171,6 +191,9 @@ v_CONTEXT_t vos_get_global_context( VOS_MODULE_ID moduleId,
 
 v_U8_t vos_is_logp_in_progress(VOS_MODULE_ID moduleId, v_VOID_t *moduleContext);
 void vos_set_logp_in_progress(VOS_MODULE_ID moduleId, v_U8_t value);
+
+v_U8_t vos_is_ssr_failed(void);
+void vos_set_ssr_failed(v_U8_t value);
 
 v_U8_t vos_is_load_unload_in_progress(VOS_MODULE_ID moduleId, v_VOID_t *moduleContext);
 void vos_set_load_unload_in_progress(VOS_MODULE_ID moduleId, v_U8_t value);
@@ -430,5 +453,20 @@ uint64_t vos_do_div64(uint64_t dividend, uint64_t divisor);
 VOS_STATUS vos_force_fw_dump(void);
 
 bool vos_is_probe_rsp_offload_enabled(void);
+/**
+ * vos_is_mon_enable - API to check if moniotr mode is on now.
+ *
+ * return - false: monitor mode is off
+ *          true: monitor mode is on
+ */
+bool vos_is_mon_enable(void);
+v_BOOL_t vos_is_ch_switch_with_csa_enabled(void);
+#ifdef FEATURE_WLAN_DISABLE_CHANNEL_SWITCH
+bool vos_is_chan_ok_for_dnbs(uint8_t channel);
+#endif
+
+int qca_request_firmware(const struct firmware **firmware_p,
+                const char *name,
+                struct device *device);
 
 #endif // if !defined __VOS_API_H
