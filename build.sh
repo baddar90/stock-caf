@@ -1,6 +1,7 @@
 export KBUILD_BUILD_USER=baddar90
 export ARCH=arm64
 export CROSS_COMPILE=$HOME/gcc-4.9/bin/aarch64-linux-android-
+export CROSS_COMPILE_ARM32=$HOME/gcc-32/bin/arm-linux-androideabi-
 
 DIR=$(pwd)
 BUILD="$HOME/build"
